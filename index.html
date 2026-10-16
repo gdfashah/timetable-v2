@@ -1,0 +1,781 @@
+<title>FCMS Timetable</title>
+<style>
+/* Layout: FCMS shell (navy sidebar) + library sub-nav tabs + one working view at a time.
+   Office standard: Arial, body 12px, headers 14px, no grey text, air-force blue family. */
+:root{
+  --navy:#0A2647;      /* sidebar, primary buttons */
+  --blue:#144C8C;      /* accent / links / focus */
+  --blue-soft:#E3ECF8; /* selected fills */
+  --bg:#EDF1F7;        /* page ground, blue-biased neutral */
+  --surface:#FFFFFF;
+  --line:#C9D4E3;
+  --ink:#0B1A2E;       /* all text */
+  --ink-2:#1E3350;     /* secondary text, still dark */
+  --gold:#C9A227;
+  --ok:#0B6B3A; --ok-bg:#DDF2E6;
+  --warn:#8A4B00; --warn-bg:#FCEBD2;
+  --bad:#A61B1B; --bad-bg:#FBE1E1;
+  --font:Arial, Helvetica, sans-serif;
+  --r:6px;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:12px/1.5 var(--font)}
+button,input,select,textarea{font:inherit;color:var(--ink)}
+h1,h2,h3{font-size:14px;margin:0;line-height:1.3;text-wrap:balance}
+.app{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:100%}
+
+/* sidebar */
+.side{background:var(--navy);color:#fff;padding:14px 10px;display:flex;flex-direction:column;gap:14px;position:sticky;top:0;height:100vh;overflow:auto}
+.brand{display:flex;gap:10px;align-items:center;padding:4px 6px}
+.brand .logo{width:34px;height:34px;border-radius:8px;background:var(--gold);color:var(--navy);display:grid;place-items:center;font-weight:700;font-size:16px}
+.brand b{display:block;font-size:14px}.brand span{font-size:10px;letter-spacing:.06em}
+.side nav{display:flex;flex-direction:column;gap:2px}
+.side a{color:#fff;text-decoration:none;padding:8px 10px;border-radius:var(--r);display:flex;gap:10px;align-items:center;cursor:pointer}
+.side a:hover{background:rgba(255,255,255,.08)}
+.side a.on{background:#fff;color:var(--navy);font-weight:700}
+.side .grp{font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:6px 10px 2px;color:#fff;font-weight:700}
+.side svg{width:16px;height:16px;flex:none}
+.side .other{opacity:.85}
+
+/* main */
+main{padding-block:18px 40px;padding-inline:22px;min-width:0}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.crumb{color:var(--ink-2)}.crumb b{color:var(--blue)}
+.sample{background:var(--warn-bg);color:var(--warn);border:1px solid #F0C98E;padding:3px 8px;border-radius:20px;font-weight:700;font-size:11px}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:4px;margin-bottom:16px;position:relative}
+.tabs button{border:0;background:none;padding:8px 12px;border-radius:4px;cursor:pointer;font-weight:700;color:var(--ink-2);display:flex;gap:6px;align-items:center;position:relative;z-index:1}
+.tabs button.on{color:#fff}
+.tabs .pill{position:absolute;top:4px;left:4px;height:calc(100% - 8px);background:var(--navy);border-radius:4px;transition:transform .35s cubic-bezier(.2,.8,.2,1),width .35s cubic-bezier(.2,.8,.2,1);z-index:0}
+.tabs .n{background:var(--bad);color:#fff;border-radius:10px;padding:0 6px;font-size:10px}
+
+.view{animation:enter .35s cubic-bezier(.2,.8,.2,1)}
+@keyframes enter{from{transform:translateY(10px);opacity:.2}to{transform:none;opacity:1}}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+.head p{margin:2px 0 0;color:var(--ink-2)}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+.card>h2{margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.g3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.g-issue{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr)}
+.stack{display:flex;flex-direction:column;gap:14px}
+.row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.row>*{flex:1 1 140px;min-width:0}
+
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:2px}
+.kpi .v{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--navy)}
+.kpi .l{font-weight:700;color:var(--ink-2);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+.kpi.alert{border-color:#E9A3A3;background:linear-gradient(var(--surface),var(--bad-bg))}
+.kpi.alert .v{color:var(--bad)}
+.kpi small{color:var(--ink-2)}
+
+/* forms */
+label.f{display:flex;flex-direction:column;gap:4px;font-weight:700}
+label.f span.h{font-weight:400;color:var(--ink-2);font-size:11px}
+input[type=text],input[type=number],input[type=date],input[type=search],select,textarea{border:1px solid #9FB1C9;border-radius:var(--r);padding:8px 10px;background:#fff;width:100%;min-width:0;transition:border-color .2s,box-shadow .2s}
+input::placeholder,textarea::placeholder{color:#4A5D78}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(20,76,140,.2)}
+.err input,.err select{border-color:var(--bad)}
+.msg{font-size:11px;font-weight:700;color:var(--bad)}
+.scan{position:relative}
+.scan input{padding-left:34px}
+.scan svg{position:absolute;left:10px;top:50%;width:16px;height:16px;transform:translateY(-50%);color:var(--blue)}
+.scan.live::after{content:"";position:absolute;inset:-1px;border-radius:var(--r);border:2px solid var(--blue);animation:ping 1.6s ease-out infinite;pointer-events:none}
+@keyframes ping{0%{opacity:.7;transform:scale(1)}100%{opacity:0;transform:scale(1.04,1.25)}}
+.btn{border:1px solid var(--navy);background:var(--navy);color:#fff;padding:8px 14px;border-radius:var(--r);font-weight:700;cursor:pointer;display:inline-flex;gap:6px;align-items:center;justify-content:center;transition:transform .12s,background .2s;white-space:nowrap}
+.btn:hover{background:var(--blue);border-color:var(--blue)}
+.btn:active{transform:scale(.97)}
+.btn.ghost{background:#fff;color:var(--navy)}
+.btn.ghost:hover{background:var(--blue-soft)}
+.btn.danger{background:var(--bad);border-color:var(--bad)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn svg{width:14px;height:14px}
+.seg{display:inline-flex;border:1px solid var(--navy);border-radius:var(--r);overflow:hidden}
+.seg button{border:0;background:#fff;color:var(--navy);padding:7px 14px;font-weight:700;cursor:pointer}
+.seg button.on{background:var(--navy);color:#fff}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:#fff;padding:4px 10px;border-radius:20px;cursor:pointer;font-weight:700;color:var(--ink-2)}
+.chip.on{background:var(--blue-soft);border-color:var(--blue);color:var(--navy)}
+.try{color:var(--ink-2)}
+.try button{border:0;background:none;color:var(--blue);font-weight:700;cursor:pointer;text-decoration:underline;padding:0 2px}
+
+/* status */
+.st{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:20px;font-weight:700;font-size:11px;white-space:nowrap}
+.st::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.st.ok{background:var(--ok-bg);color:var(--ok)}
+.st.warn{background:var(--warn-bg);color:var(--warn)}
+.st.bad{background:var(--bad-bg);color:var(--bad)}
+.st.mute{background:#E4E9F1;color:var(--ink-2)}
+
+/* tables */
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r)}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:inherit}
+th{background:#E6EDF6;text-align:left;font-weight:700;padding:8px 10px;white-space:nowrap;border-bottom:1px solid var(--line);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+td{padding:8px 10px;border-bottom:1px solid #E1E8F1;vertical-align:middle}
+tr:last-child td{border-bottom:0}
+tbody tr{animation:rowin .35s both cubic-bezier(.2,.8,.2,1)}
+tbody tr.click{cursor:pointer}
+tbody tr.click:hover td{background:#F2F6FB}
+@keyframes rowin{from{transform:translateX(-6px);opacity:.3}to{transform:none;opacity:1}}
+td.num,th.num{text-align:right}
+.mono{font-family:"Courier New",monospace;font-weight:700;font-size:12px}
+.empty{padding:26px;text-align:center;color:var(--ink-2)}
+.empty b{display:block;color:var(--ink);font-size:14px;margin-bottom:4px}
+
+/* borrower / book cards */
+.who{display:flex;gap:12px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:var(--r);background:#F7FAFD;animation:pop .4s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes pop{from{transform:scale(.96);opacity:.3}to{transform:none;opacity:1}}
+.av{width:42px;height:42px;border-radius:50%;background:var(--navy);color:#fff;display:grid;place-items:center;font-weight:700;flex:none}
+.who .meta{flex:1;min-width:0}
+.who .meta b{font-size:14px;display:block}
+.limit{display:flex;gap:3px;margin-top:4px}
+.limit i{width:16px;height:6px;border-radius:3px;background:#D3DCE8}
+.limit i.u{background:var(--blue)}
+.limit i.o{background:var(--bad)}
+.notice{padding:10px 12px;border-radius:var(--r);font-weight:700;display:flex;gap:8px;align-items:flex-start}
+.notice.bad{background:var(--bad-bg);color:var(--bad)}
+.notice.warn{background:var(--warn-bg);color:var(--warn)}
+.notice.ok{background:var(--ok-bg);color:var(--ok)}
+.notice svg{width:16px;height:16px;flex:none;margin-top:1px}
+.book{display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:var(--r);animation:pop .4s cubic-bezier(.2,.9,.3,1.2)}
+.spine{width:44px;height:58px;border-radius:3px 6px 6px 3px;background:linear-gradient(90deg,var(--navy) 0 7px,var(--blue) 7px);color:#fff;display:grid;place-items:center;font-size:10px;font-weight:700;writing-mode:vertical-rl;text-orientation:mixed}
+.book b{display:block;font-size:13px}
+.kv{display:flex;flex-wrap:wrap;gap:4px 14px;color:var(--ink-2);margin-top:2px}
+.kv span b{display:inline;font-size:12px;color:var(--ink)}
+.cart{display:flex;flex-direction:column;gap:6px}
+.cart .it{display:flex;gap:10px;align-items:center;padding:8px 10px;border:1px dashed #9FB1C9;border-radius:var(--r);animation:drop .45s cubic-bezier(.2,.9,.3,1.3)}
+@keyframes drop{from{transform:translateY(-14px) scale(.97);opacity:.2}to{transform:none;opacity:1}}
+.cart .it .t{flex:1;min-width:0}
+.x{border:0;background:none;cursor:pointer;color:var(--bad);font-weight:700;padding:4px}
+.sum{display:flex;justify-content:space-between;align-items:center;gap:10px;padding-top:10px;border-top:1px solid var(--line);flex-wrap:wrap}
+.big{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+
+/* chart */
+.bars{display:flex;align-items:flex-end;gap:6px;height:150px;padding:8px 0 0;border-bottom:1px solid var(--line);position:relative}
+.bars .b{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:3px;min-width:0}
+.bars .b i{display:block;width:100%;max-width:26px;background:var(--blue);border-radius:3px 3px 0 0;transform-origin:bottom;animation:grow .7s both cubic-bezier(.2,.8,.2,1)}
+.bars .b.today i{background:var(--gold)}
+.bars .b em{font-style:normal;font-size:10px;font-weight:700}
+@keyframes grow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+.axis{display:flex;gap:6px;margin-top:4px}
+.axis span{flex:1;text-align:center;font-size:10px;color:var(--ink-2);min-width:0}
+.hbar{display:grid;grid-template-columns:150px minmax(0,1fr) 44px;gap:8px;align-items:center;margin:5px 0}
+.hbar .tr{height:10px;background:#E4EAF2;border-radius:5px;overflow:hidden}
+.hbar .tr i{display:block;height:100%;background:var(--blue);border-radius:5px;transform-origin:left;animation:growx .8s both cubic-bezier(.2,.8,.2,1)}
+@keyframes growx{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.hbar span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.list{display:flex;flex-direction:column}
+.list .li{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #E1E8F1}
+.list .li:last-child{border-bottom:0}
+.list .li .t{flex:1;min-width:0}
+
+/* drawer */
+.scrim{position:fixed;inset:0;background:rgba(10,38,71,.35);animation:fade .25s;z-index:20}
+@keyframes fade{from{opacity:0}}
+.drawer{position:fixed;top:0;right:0;height:100%;width:min(420px,100%);background:#fff;z-index:21;padding:18px;overflow:auto;box-shadow:-10px 0 30px rgba(10,38,71,.2);animation:slide .35s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column;gap:14px}
+@keyframes slide{from{transform:translateX(100%)}}
+.tl{border-left:2px solid var(--line);margin-left:6px;padding-left:14px;display:flex;flex-direction:column;gap:10px}
+.tl div{position:relative}.tl div::before{content:"";position:absolute;left:-20px;top:4px;width:10px;height:10px;border-radius:50%;background:var(--blue)}
+
+/* accession preview */
+.labels{display:flex;flex-wrap:wrap;gap:8px}
+.lbl{border:1px solid var(--ink);border-radius:4px;padding:6px 8px 4px;background:#fff;width:118px;animation:pop .35s both cubic-bezier(.2,.9,.3,1.2)}
+.lbl .bc{height:22px;background:repeating-linear-gradient(90deg,var(--ink) 0 1px,transparent 1px 3px,var(--ink) 3px 5px,transparent 5px 6px,var(--ink) 6px 7px,transparent 7px 9px)}
+.lbl div{display:flex;justify-content:space-between;font-size:10px;font-weight:700;margin-top:3px}
+
+/* success */
+.done{display:flex;flex-direction:column;align-items:center;gap:8px;padding:22px;text-align:center}
+.done svg{width:64px;height:64px}
+.done circle{stroke:var(--ok);stroke-width:3;fill:var(--ok-bg);stroke-dasharray:180;stroke-dashoffset:180;animation:draw .5s forwards}
+.done path{stroke:var(--ok);stroke-width:4;fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:50;stroke-dashoffset:50;animation:draw .35s .45s forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+
+/* reports */
+.rep{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.rc{border:1px solid var(--line);background:#fff;border-radius:var(--r);padding:12px;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:4px;transition:transform .2s,box-shadow .2s,border-color .2s}
+.rc:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(10,38,71,.12);border-color:var(--blue)}
+.rc.on{border-color:var(--navy);box-shadow:inset 0 0 0 1px var(--navy);background:#F5F8FC}
+.rc b{font-size:13px}.rc span{color:var(--ink-2)}
+.rc .tag{align-self:flex-start}
+
+/* category merge */
+.merge{border:1px solid var(--line);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;gap:8px}
+.merge .from{display:flex;flex-wrap:wrap;gap:6px}
+.merge .from span{background:var(--bad-bg);color:var(--bad);padding:2px 8px;border-radius:4px;font-weight:700;font-size:11px;transition:transform .45s cubic-bezier(.6,0,.4,1),opacity .45s}
+.merge.merging .from span{transform:translateY(18px) scale(.6);opacity:0}
+.merge .to{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.merge.done2{border-color:var(--ok);background:var(--ok-bg)}
+
+/* toast */
+.toasts{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom,0px));right:16px;display:flex;flex-direction:column;gap:8px;z-index:30;max-width:calc(100% - 32px)}
+.toast{background:var(--navy);color:#fff;padding:10px 14px;border-radius:var(--r);font-weight:700;box-shadow:0 8px 24px rgba(10,38,71,.3);animation:tin .35s cubic-bezier(.2,.9,.3,1.2)}
+.toast.ok{background:var(--ok)}.toast.bad{background:var(--bad)}
+@keyframes tin{from{transform:translateY(20px);opacity:0}}
+
+.inline-confirm{border:1px solid var(--bad);background:var(--bad-bg);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;gap:8px;animation:pop .3s}
+
+.quiet .view,.quiet tbody tr,tbody tr.still{animation:none}
+td .acts{flex-wrap:nowrap}
+td.mono{white-space:nowrap}
+#stabs{display:flex;flex-wrap:wrap;width:fit-content;max-width:100%}
+@media (max-width:1100px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.g3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:860px){
+  .app{grid-template-columns:1fr}
+  .side{position:static;height:auto;flex-direction:row;align-items:center;flex-wrap:wrap;padding:10px 16px}
+  .side nav,.side .grp{display:none}
+  main{padding-inline:16px}
+  .g2,.g3,.g-issue{grid-template-columns:1fr}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .hbar{grid-template-columns:110px minmax(0,1fr) 36px}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:1ms!important;animation-delay:0ms!important;transition-duration:1ms!important}}
+
+/* ---- timetable additions ---- */
+:root{
+  --pri:#0F6B5F; --pri-bg:#D9F1EC;
+  --sec:#144C8C; --sec-bg:#DDE8F7;
+  --hss:#5B2A86; --hss-bg:#ECE0F7;
+  --cam:#8A3B12; --cam-bg:#F8E3D6;
+}
+.sx-pri{--sc:var(--pri);--sb:var(--pri-bg)} .sx-sec{--sc:var(--sec);--sb:var(--sec-bg)}
+.sx-hss{--sc:var(--hss);--sb:var(--hss-bg)} .sx-cam{--sc:var(--cam);--sb:var(--cam-bg)}
+.sx-x{--sc:#3A4A60;--sb:#E4E9F1}
+.tag{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:4px;background:var(--sb);color:var(--sc);font-weight:700;font-size:11px;white-space:nowrap}
+.tag::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--sc)}
+
+/* section timeline */
+.tline{position:relative;padding-top:22px;user-select:none}
+.tline .axis2{position:absolute;top:0;left:120px;right:0;height:20px}
+.tline .axis2 span{position:absolute;transform:translateX(-50%);font-size:10px;font-weight:700;color:var(--ink-2)}
+.tline .lane{display:grid;grid-template-columns:120px minmax(0,1fr);align-items:center;gap:0;margin-bottom:8px}
+.tline .lane>b{font-size:12px;padding-right:8px}
+.tline .track{position:relative;height:34px;background:repeating-linear-gradient(90deg,transparent 0 calc(var(--hr) - 1px),#D3DCE8 calc(var(--hr) - 1px) var(--hr));border-radius:4px}
+.tline .blk{position:absolute;top:3px;bottom:3px;border-radius:3px;background:var(--sb);border:1px solid var(--sc);color:var(--sc);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;overflow:hidden;white-space:nowrap;animation:growx .6s both cubic-bezier(.2,.8,.2,1);transform-origin:left}
+.tline .blk.brk{background:repeating-linear-gradient(135deg,#FCEBD2 0 5px,#F7DDB5 5px 10px);border-color:#C98A2E;color:var(--warn)}
+.tline .blk.asm{background:#E4E9F1;border-color:#5A6B85;color:var(--ink)}
+.tline .blk.now{box-shadow:0 0 0 2px var(--ink);}
+.tline .nowline{position:absolute;top:18px;bottom:0;width:2px;background:var(--bad);z-index:3;cursor:ew-resize;transition:left .05s}
+.tline .nowline::before{content:attr(data-t);position:absolute;top:-18px;left:50%;transform:translateX(-50%);background:var(--bad);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;white-space:nowrap}
+.tline .nowline::after{content:"";position:absolute;inset:0 -8px}
+.tline .lanes{position:relative}
+
+/* class grid */
+.tt{border-collapse:separate;border-spacing:0;width:100%;min-width:760px}
+.tt th{position:sticky;top:0;z-index:1}
+.tt th.ph,.tt td.ph{width:96px;background:#E6EDF6;border-right:1px solid var(--line)}
+.tt td.ph b{display:block;font-size:13px}
+.tt td{padding:4px;border-bottom:1px solid #E1E8F1;border-right:1px solid #EEF2F7;height:64px;vertical-align:stretch}
+.tt td.brkrow{height:auto;padding:6px;background:repeating-linear-gradient(135deg,#FDF3E3 0 6px,#FBEAD0 6px 12px);text-align:center;font-weight:700;color:var(--warn);letter-spacing:.2em;font-size:11px}
+.cell{height:100%;min-height:54px;border-radius:5px;padding:5px 7px;cursor:pointer;display:flex;flex-direction:column;gap:1px;border:1px dashed transparent;transition:transform .15s,box-shadow .15s;position:relative}
+.cell:hover{transform:translateY(-1px);box-shadow:0 4px 10px rgba(10,38,71,.14)}
+.cell.empty{border-color:#B4C2D6;color:var(--ink-2);align-items:center;justify-content:center;font-weight:700}
+.cell.empty:hover{background:var(--blue-soft);border-color:var(--blue);color:var(--navy)}
+.cell b{font-size:12px}.cell span{font-size:11px}
+.cell .tm{font-size:10px;font-weight:700;opacity:.9}
+.cell.clash{box-shadow:inset 0 0 0 2px var(--bad)}
+.cell.clash::after{content:"!";position:absolute;top:4px;right:6px;width:16px;height:16px;border-radius:50%;background:var(--bad);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center}
+.cell.dragover{outline:2px dashed var(--navy);outline-offset:2px}
+.cell.brkcell{background:repeating-linear-gradient(135deg,#FDF3E3 0 6px,#FBEAD0 6px 12px);color:var(--warn);cursor:default;align-items:center;justify-content:center;font-weight:700;font-size:11px}
+.cell.brkcell:hover{transform:none;box-shadow:none}
+.cell.off{background:#EEF2F7;cursor:default;align-items:center;justify-content:center;color:var(--ink-2)}
+.cell.off:hover{transform:none;box-shadow:none}
+.tt th.today{background:var(--navy);color:#fff}
+.legend{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;font-weight:700}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:4px}
+
+/* teacher week */
+.week{display:grid;grid-template-columns:52px repeat(var(--days),minmax(110px,1fr));min-width:720px}
+.week .hd{font-weight:700;text-align:center;padding:6px;background:#E6EDF6;border-bottom:1px solid var(--line)}
+.week .col{position:relative;border-right:1px solid #E1E8F1;background:repeating-linear-gradient(180deg,transparent 0 calc(var(--hh) - 1px),#E1E8F1 calc(var(--hh) - 1px) var(--hh))}
+.week .hrs{position:relative}
+.week .hrs span{position:absolute;right:6px;transform:translateY(-50%);font-size:10px;font-weight:700;color:var(--ink-2)}
+.lsn{position:absolute;left:4px;right:4px;border-radius:4px;background:var(--sb);border-left:4px solid var(--sc);color:var(--ink);padding:3px 6px;font-size:10px;line-height:1.25;overflow:hidden;animation:pop .35s both}
+.lsn b{font-size:11px;display:block}
+.lsn.clash{background:var(--bad-bg);border-left-color:var(--bad);box-shadow:0 0 0 1px var(--bad)}
+
+/* bell editor */
+.slots td{vertical-align:middle}
+.slots input[type=number]{max-width:80px}
+.slots input[type=time]{max-width:120px}
+.slots tr.brk td{background:#FDF6EA}
+.slots tr.asm td{background:#F1F4F8}
+.mini{border:1px solid var(--line);background:#fff;border-radius:4px;width:26px;height:26px;cursor:pointer;font-weight:700;color:var(--navy)}
+.mini:hover{background:var(--blue-soft)}
+.mini[disabled]{opacity:.35;cursor:not-allowed}
+.secard{border:1px solid var(--line);border-left:5px solid var(--sc);border-radius:var(--r);padding:10px 12px;background:#fff;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:3px;transition:transform .2s,box-shadow .2s}
+.secard:hover{transform:translateY(-1px);box-shadow:0 6px 14px rgba(10,38,71,.1)}
+.secard.on{background:var(--sb);box-shadow:inset 0 0 0 1px var(--sc)}
+.secard b{font-size:13px;color:var(--sc)}
+.secard.off{opacity:.6}
+input[type=time]{border:1px solid #9FB1C9;border-radius:var(--r);padding:7px 8px;background:#fff;min-width:0}
+.drawer select,.drawer input{width:100%}
+.opt-busy{color:#6B7A90}
+.now-card{display:flex;flex-direction:column;gap:6px}
+.now-row{display:grid;grid-template-columns:70px minmax(0,1fr);gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid #E1E8F1}
+.now-row:last-child{border-bottom:0}
+.pct{height:6px;background:#E4EAF2;border-radius:3px;overflow:hidden}
+.pct i{display:block;height:100%;background:var(--sc);transition:width .3s}
+</style>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="logo">F</div><div><b>FCMS</b><span>FAZAIA CHAIN MGMT</span></div></div>
+    <div class="grp">Timetable</div>
+    <nav id="sidenav"></nav>
+  </aside>
+  <main>
+    <div class="top"><div class="crumb">Timetable › <b id="crumb">Today</b></div><span class="sample">Prototype · sample data</span></div>
+    <div class="tabs" id="tabs"><span class="pill" id="pill"></span></div>
+    <div id="view"></div>
+  </main>
+</div>
+<div class="toasts" id="toasts"></div>
+<div id="layer"></div>
+<script>
+/* ================= helpers ================= */
+const I={
+ now:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+ grid:'<path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18"/>',
+ user:'<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
+ plan:'<path d="M4 5h16M4 10h16M4 15h10M4 20h7"/>',
+ bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10 20a2 2 0 0 0 4 0"/>',
+ layers:'<path d="M12 3l9 5-9 5-9-5zM3 13l9 5 9-5"/>',
+ door:'<path d="M5 21V4h11v17M16 21h3M12 12v.5"/>',
+ warn:'<path d="M12 3l10 18H2zM12 10v5M12 18v.5"/>',
+ info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>',
+ plus:'<path d="M12 5v14M5 12h14"/>',
+ dl:'<path d="M12 4v11M7 10l5 5 5-5M4 20h16"/>',
+ copy:'<path d="M8 8h12v12H8zM4 16V4h12"/>'
+};
+const ic=n=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${I[n]}</svg>`;
+const toMin=t=>{const[h,m]=t.split(':').map(Number);return h*60+m};
+const hm=m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+const t12=m=>{let h=Math.floor(m/60),mm=String(m%60).padStart(2,'0');const ap=h>=12?'pm':'am';h=h%12||12;return `${h}:${mm} ${ap}`};
+const t12s=m=>{let h=Math.floor(m/60),mm=String(m%60).padStart(2,'0');h=h%12||12;return `${h}:${mm}`};
+const rng=(s=>()=>(s=(s*16807)%2147483647)/2147483647)(42);
+function toast(msg,kind=''){const t=document.createElement('div');t.className='toast '+kind;t.textContent=msg;document.getElementById('toasts').appendChild(t);setTimeout(()=>{t.style.transition='opacity .3s';t.style.opacity=0;setTimeout(()=>t.remove(),300)},2800)}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat'];
+const DAYN={Mon:'Monday',Tue:'Tuesday',Wed:'Wednesday',Thu:'Thursday',Fri:'Friday',Sat:'Saturday'};
+const pat=d=>d=='Fri'?'fri':'reg';
+const PATN={reg:'Mon–Thu & Sat',fri:'Friday'};
+
+/* ================= sections & bell schedules ================= */
+const P=d=>({t:'p',d}),B=(d,l='Break')=>({t:'brk',d,l}),A=(d,l='Assembly')=>({t:'asm',d,l});
+const rep=(n,d)=>Array.from({length:n},()=>P(d));
+let SECTIONS=[
+ {id:'pri',name:'Primary Section',short:'Primary',cx:'sx-pri',classes:['Prep','1','2','3','4','5'],active:true,sat:true,
+  sched:{reg:{start:'07:45',slots:[A(15),...rep(4,35),B(25,'Break / Lunch'),...rep(3,35)]},fri:{start:'07:45',slots:[A(10),...rep(4,30),B(15),...rep(2,30)]}}},
+ {id:'sec',name:'Secondary Section',short:'Secondary',cx:'sx-sec',classes:['6','7','8','9','10'],active:true,sat:true,
+  sched:{reg:{start:'07:45',slots:[A(15),...rep(4,40),B(20),...rep(4,40)]},fri:{start:'07:45',slots:[A(10),...rep(4,30),B(15),...rep(3,30)]}}},
+ {id:'hss',name:'Higher Secondary Section',short:'HSSC',cx:'sx-hss',classes:['11','12'],active:true,sat:true,
+  sched:{reg:{start:'08:00',slots:[...rep(3,45),B(20),...rep(4,45)]},fri:{start:'08:00',slots:[...rep(3,35),B(15),...rep(3,35)]}}},
+ {id:'cam',name:'Cambridge Section',short:'Cambridge',cx:'sx-cam',classes:['Pre O','O1','O2','O3','AS','A2'],active:true,sat:false,
+  sched:{reg:{start:'08:00',slots:[...rep(3,50),B(25),...rep(3,50)]},fri:{start:'08:00',slots:[...rep(3,40),B(15),...rep(2,40)]}}}
+];
+const secOf=cls=>SECTIONS.find(s=>s.classes.includes(cls));
+const secById=id=>SECTIONS.find(s=>s.id==id);
+function slotsFor(sec,p){ // computed slots with times & period numbers
+ const sc=sec.sched[p];let m=toMin(sc.start),n=0;
+ return sc.slots.map((x,i)=>{const o={...x,i,s:m,e:m+(+x.d||0)};m=o.e;if(x.t=='p'){o.pn=++n;o.label='P'+n}else o.label=x.l||(x.t=='brk'?'Break':'Assembly');return o});
+}
+const dayOn=(sec,d)=>d!='Sat'||sec.sat;
+const periodsOf=(sec,d)=>slotsFor(sec,pat(d)).filter(x=>x.t=='p');
+
+/* ================= classes, subjects, teachers, rooms ================= */
+const SECLETTERS={Prep:'AB','1':'AB','2':'AB','3':'A','4':'AB','5':'A','6':'AB','7':'AB','8':'A','9':'AB','10':'AB','11':'AB','12':'AB','Pre O':'A','O1':'A','O2':'A','O3':'A','AS':'A','A2':'A'};
+let CLASSES=[];
+SECTIONS.forEach(s=>s.classes.forEach(c=>SECLETTERS[c].split('').forEach(l=>CLASSES.push({id:c+'-'+l,cls:c,letter:l,room:'Room '+c+'-'+l}))));
+const cOf=id=>CLASSES.find(c=>c.id==id);
+const secOfClass=id=>secOf(cOf(id).cls);
+const SUBJ={
+ pri:['English','Urdu','Maths','Science','Islamiat','Social Studies','Computer','Art'],
+ sec:['English','Urdu','Maths','Physics','Chemistry','Biology','Islamiat','Pak Studies','Computer'],
+ hss:['English','Urdu','Physics','Chemistry','Biology','Maths','Islamiat','Pak Studies'],
+ cam:['English','Maths','Physics','Chemistry','Biology','Computer Science','Urdu','Islamiat']
+};
+const ALLSUBJ=[...new Set(Object.values(SUBJ).flat())];
+const SCOL=['#DCEBFB','#E3F4E1','#FCEBD9','#EFE3F8','#FBE1E6','#DDF3F2','#F5F0D5','#E6E9F5','#F3E1D5','#E1EEF0'];
+const subjBg=s=>SCOL[ALLSUBJ.indexOf(s)%SCOL.length];
+
+const NAMES=['Sana Malik','Hina Javed','Rabia Aslam','Nida Farooq','Amna Shah','Fatima Zahid','Mehwish Ali','Saba Qureshi','Uzma Khalid','Asma Riaz','Sadia Noor','Farah Iqbal','Kiran Abbas','Shazia Rauf','Imran Qureshi','Saima Bukhari','Usman Tariq','Ayesha Siddiqui','Kashif Mehmood','Zainab Raza','Tariq Hussain','Bilal Ahmed','Naveed Akhtar','Rizwan Haider','Sobia Khan','Adnan Shafiq','Faisal Nadeem','Adeel Anwar','Mehreen Sohail','Hira Waseem','Omer Farooq','Lubna Saeed','Waqas Ali','Nadia Hameed','Shahid Latif','Humaira Butt','Yasir Mahmood','Arshad Iqbal','Maryam Akram','Samina Yousaf','Zubair Khan','Rubina Aziz','Junaid Asghar','Aliya Rehman','Kamran Shah'];
+let TEACHERS=[];let POOL={};let ni=0;
+SECTIONS.forEach(s=>{POOL[s.id]={};const n=CLASSES.filter(c=>secOf(c.cls)==s).length;
+ SUBJ[s.id].forEach(sub=>{POOL[s.id][sub]=[];
+  const shared=(s.id=='hss'&&['Physics','Chemistry','Maths','English','Islamiat','Pak Studies','Urdu'].includes(sub))||(s.id=='cam'&&['Physics','Biology','Urdu','Islamiat'].includes(sub));
+  if(shared){const src=POOL.sec[sub==='Computer Science'?'Computer':sub];if(src){POOL[s.id][sub].push(...src);src.forEach(id=>{const t=TEACHERS.find(x=>x.id==id);if(!t.secs.includes(s.id))t.secs.push(s.id)})}}
+  const need=shared?1:Math.max(1,Math.ceil(n/5));
+  for(let k=0;k<need;k++){const id='T'+String(TEACHERS.length+1).padStart(2,'0');TEACHERS.push({id,name:NAMES[ni++%NAMES.length],subj:sub,secs:[s.id],home:s.id});POOL[s.id][sub].push(id)}
+ })});
+const tOf=id=>TEACHERS.find(t=>t.id==id);
+const shortN=n=>{const p=n.split(' ');return p[0][0]+'. '+p.slice(1).join(' ')};
+let ROOMS=[...CLASSES.map(c=>({name:c.room,type:'Classroom',cap:35})),{name:'Physics Lab',type:'Lab',cap:30},{name:'Chemistry Lab',type:'Lab',cap:30},{name:'Biology Lab',type:'Lab',cap:30},{name:'Computer Lab 1',type:'Lab',cap:32},{name:'Computer Lab 2',type:'Lab',cap:32},{name:'Art Room',type:'Activity',cap:30}];
+
+/* ================= entries & clash detection ================= */
+let E={}; // key "classId|Day|pn" -> {s:subject,t:teacherId,r:room}
+const key=(c,d,pn)=>`${c}|${d}|${pn}`;
+function timeOf(cid,d,pn){const x=periodsOf(secOfClass(cid),d).find(p=>p.pn==pn);return x?[x.s,x.e]:null}
+let IDX=null;
+function idx(){if(IDX)return IDX;IDX={t:{},r:{}};
+ for(const k in E){const [c,d,pn]=k.split('|'),e=E[k],tm=timeOf(c,d,+pn);if(!tm)continue;const it={k,c,d,pn:+pn,s:tm[0],e:tm[1]};
+  if(e.t)(IDX.t[e.t+'|'+d]=IDX.t[e.t+'|'+d]||[]).push(it);
+  if(e.r)(IDX.r[e.r+'|'+d]=IDX.r[e.r+'|'+d]||[]).push(it)}
+ return IDX}
+const dirty=()=>{IDX=null;CL=null};
+const ov=(a,b)=>a.s<b.e&&b.s<a.e;
+function busyT(tid,d,s,e,exceptKey){return (idx().t[tid+'|'+d]||[]).find(x=>x.k!=exceptKey&&ov(x,{s,e}))}
+function busyR(r,d,s,e,exceptKey){return (idx().r[r+'|'+d]||[]).find(x=>x.k!=exceptKey&&ov(x,{s,e}))}
+let CL=null,NPAIRS=0;
+const nClash=()=>{clashes();return NPAIRS};
+function clashes(){if(CL)return CL;CL={};NPAIRS=0;const I=idx();
+ const scan=(map,kind)=>{for(const g in map){const a=map[g].slice().sort((x,y)=>x.s-y.s);for(let i=0;i<a.length;i++)for(let j=i+1;j<a.length&&a[j].s<a[i].e;j++){NPAIRS++;(CL[a[i].k]=CL[a[i].k]||[]).push({kind,with:a[j]});(CL[a[j].k]=CL[a[j].k]||[]).push({kind,with:a[i]})}}};
+ scan(I.t,'teacher');scan(I.r,'room');return CL}
+
+/* sample generator: fills each class with conflict-free lessons */
+(function gen(){
+ SECTIONS.forEach(sec=>{const cls=CLASSES.filter(c=>secOf(c.cls)==sec),subs=SUBJ[sec.id];
+  cls.forEach((c,ci)=>DAYS.forEach((d,di)=>{if(!dayOn(sec,d))return;
+   periodsOf(sec,d).forEach(p=>{if(rng()<.04)return;
+    for(let tries=0;tries<subs.length;tries++){const sub=subs[(p.pn*3+di*2+ci+tries)%subs.length];
+     const pool=POOL[sec.id][sub];const order=pool.map((_,i)=>pool[(i+ci)%pool.length]);
+     const t=order.find(t=>!busyT(t,d,p.s,p.e));if(!t)continue;
+     let r=c.room;if(/Computer/.test(sub)){r=['Computer Lab 1','Computer Lab 2'].find(x=>!busyR(x,d,p.s,p.e))||c.room}
+     E[key(c.id,d,p.pn)]={s:sub,t,r};dirty();break}
+   })}))});
+ // one deliberate clash: a Secondary physics teacher also put in HSSC at an overlapping time
+ const phy=POOL.sec.Physics[0],mine=(idx().t[phy+'|Mon']||[]).find(x=>secOfClass(x.c).id=='sec');
+ if(mine){const hp=periodsOf(secById('hss'),'Mon').find(p=>ov(p,mine));if(hp){E[key('11-A','Mon',hp.pn)]={s:'Physics',t:phy,r:'Physics Lab'};dirty()}}
+})();
+
+/* ================= shell ================= */
+const PAGES=[['today','Today',ic('now')],['class','Class timetable',ic('grid')],['teacher','Teacher timetable',ic('user')],['planner','Day planner',ic('plan')],['bells','Period timings',ic('bell')],['sections','Sections & classes',ic('layers')],['rooms','Rooms',ic('door')]];
+let cur='today';
+function shell(){const n=nClash();
+ document.getElementById('sidenav').innerHTML=PAGES.map(p=>`<a data-go="${p[0]}" class="${p[0]==cur?'on':''}">${p[2]}${p[1]}</a>`).join('');
+ document.getElementById('tabs').innerHTML='<span class="pill" id="pill"></span>'+PAGES.map(p=>`<button data-go="${p[0]}" class="${p[0]==cur?'on':''}">${p[1]}${p[0]=='class'&&n?`<span class="n">${n}</span>`:''}</button>`).join('');
+ document.getElementById('crumb').textContent=PAGES.find(p=>p[0]==cur)[1];requestAnimationFrame(movePill)}
+function movePill(){const t=document.getElementById('tabs'),on=t.querySelector('button.on'),p=document.getElementById('pill');if(!on||!p)return;p.style.width=on.offsetWidth+'px';p.style.transform=`translate(${on.offsetLeft-4}px,${on.offsetTop-4}px)`}
+addEventListener('resize',movePill);
+function go(p){cur=p;shell();render();scrollTo({top:0});try{localStorage.setItem('fcms-tt-tab',p)}catch(e){}}
+document.addEventListener('click',e=>{const g=e.target.closest('[data-go]');if(g){e.preventDefault();go(g.dataset.go)}});
+const V={};
+let RENDERING=false;
+function render(quiet){if(RENDERING){setTimeout(()=>render(quiet));return}RENDERING=true;try{const v=document.getElementById('view');v.classList.toggle('quiet',!!quiet);v.innerHTML=V[cur]();V[cur].after&&V[cur].after()}finally{RENDERING=false}}
+const $=id=>document.getElementById(id);
+
+/* ================= shared: section timeline ================= */
+function timeline(day,nowM,id='tl'){
+ const secs=SECTIONS.filter(s=>s.active&&dayOn(s,day));if(!secs.length)return '<div class="empty"><b>No sections work on this day</b></div>';
+ const all=secs.map(s=>slotsFor(s,pat(day)));const lo=Math.floor((Math.min(...all.map(a=>a[0].s))-15)/60)*60,hi=Math.ceil((Math.max(...all.map(a=>a[a.length-1].e))+15)/60)*60;
+ const pc=m=>((m-lo)/(hi-lo)*100).toFixed(3)+'%';const hours=[];for(let h=lo;h<=hi;h+=60)hours.push(h);
+ return `<div class="tline" id="${id}" data-lo="${lo}" data-hi="${hi}" style="--hr:${(60/(hi-lo)*100).toFixed(3)}%">
+  <div class="axis2">${hours.map(h=>`<span style="left:${pc(h)}">${t12s(h)}</span>`).join('')}</div>
+  <div class="lanes">${secs.map((s,si)=>`<div class="lane ${s.cx}"><b>${s.short}</b><div class="track">${all[si].map((x,i)=>`<div class="blk ${x.t=='brk'?'brk':x.t=='asm'?'asm':''} ${nowM!=null&&nowM>=x.s&&nowM<x.e?'now':''}" style="left:${pc(x.s)};width:calc(${pc(x.e)} - ${pc(x.s)} - 2px);animation-delay:${si*80+i*25}ms" title="${x.label} ${t12(x.s)}–${t12(x.e)}">${x.t=='p'?x.label:x.t=='brk'?'Break':'Asm'}</div>`).join('')}</div></div>`).join('')}
+  ${nowM!=null?`<div class="nowline" id="${id}-now" style="left:calc(120px + (100% - 120px) * ${(nowM-lo)/(hi-lo)})" data-t="${t12(nowM)}" role="slider" tabindex="0" aria-label="Time" aria-valuenow="${nowM}"></div>`:''}
+  </div></div>`}
+
+/* ================= TODAY ================= */
+const realNow=new Date();const REALDAY=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][realNow.getDay()];
+let TD={day:REALDAY=='Sun'?'Mon':REALDAY,now:(()=>{const m=realNow.getHours()*60+realNow.getMinutes(),d=REALDAY=='Sun'?'Mon':REALDAY;const inSession=SECTIONS.some(s=>s.active&&dayOn(s,d)&&slotsFor(s,pat(d)).some(x=>m>=x.s&&m<x.e));return inSession?m:9*60+5})()};
+function nowCards(){
+ return SECTIONS.filter(s=>s.active&&dayOn(s,TD.day)).map(s=>{const sl=slotsFor(s,pat(TD.day)),cur=sl.find(x=>TD.now>=x.s&&TD.now<x.e),cls=CLASSES.filter(c=>secOf(c.cls)==s);
+  const head=cur?`${cur.label} · ${t12(cur.s)}–${t12(cur.e)}`:TD.now<sl[0].s?`Starts ${t12(sl[0].s)}`:`Finished at ${t12(sl[sl.length-1].e)}`;
+  const pct=cur?Math.round((TD.now-cur.s)/(cur.e-cur.s)*100):TD.now>=sl[sl.length-1].e?100:0;
+  return `<div class="card now-card ${s.cx}"><h2 style="margin:0"><span class="tag">${s.short}</span><span>${head}</span></h2><div class="pct"><i style="width:${pct}%"></i></div>
+   ${cur&&cur.t=='p'?`<div>${cls.map(c=>{const e=E[key(c.id,TD.day,cur.pn)];return `<div class="now-row"><b>${c.id}</b><span>${e?`<b>${e.s}</b> · ${shortN(tOf(e.t).name)} · ${e.r}`:'<span class="st bad">No teacher assigned</span>'}</span></div>`}).join('')}</div>`
+   :`<p style="margin:0">${cur?`${cur.label} for all ${cls.length} classes.`:'No lessons right now.'}</p>`}</div>`}).join('')}
+function freeTeachers(){return TEACHERS.filter(t=>t.secs.some(id=>{const s=secById(id);return s.active&&dayOn(s,TD.day)})&&!busyT(t.id,TD.day,TD.now,TD.now+1)&&SECTIONS.some(s=>t.secs.includes(s.id)&&slotsFor(s,pat(TD.day)).some(x=>x.t=='p'&&TD.now>=x.s&&TD.now<x.e)))}
+V.today=()=>{const nC=nClash();let tot=0,fill=0;CLASSES.forEach(c=>{const s=secOfClass(c.id);if(!s.active)return;DAYS.forEach(d=>{if(!dayOn(s,d))return;periodsOf(s,d).forEach(p=>{tot++;if(E[key(c.id,d,p.pn)])fill++})})});
+ const ft=freeTeachers();
+ return `<div class="view">
+ <div class="head"><div><h1>Today across the school</h1><p>Each section runs on its own bell. Drag the red line to see any time of day.</p></div>
+  <div class="seg" id="tdday">${DAYS.map(d=>`<button data-d="${d}" class="${TD.day==d?'on':''}">${d}</button>`).join('')}</div></div>
+ <div class="kpis">
+  <div class="kpi"><span class="l">Sections running</span><span class="v">${SECTIONS.filter(s=>s.active&&dayOn(s,TD.day)).length}</span><small>${SECTIONS.filter(s=>s.active).map(s=>s.short).join(' · ')}</small></div>
+  <div class="kpi"><span class="l">Class sections</span><span class="v">${CLASSES.filter(c=>secOfClass(c.id).active).length}</span><small>Prep to A2</small></div>
+  <div class="kpi"><span class="l">Teachers</span><span class="v">${TEACHERS.length}</span><small>${TEACHERS.filter(t=>t.secs.length>1).length} teach in 2 sections</small></div>
+  <div class="kpi ${tot-fill?'':'ok'}"><span class="l">Periods filled</span><span class="v">${Math.round(fill/tot*100)}%</span><small>${tot-fill} empty periods this week</small></div>
+  <div class="kpi ${nC?'alert':''}"><span class="l">Clashes</span><span class="v">${nC}</span><small>${nC?'<a href="#" data-go="class">Fix in class timetable</a>':'None'}</small></div>
+ </div>
+ <div class="card" style="margin-bottom:14px"><h2>${DAYN[TD.day]} · bell timings by section <span class="legend"><span><i style="background:#FCEBD2;border:1px solid #C98A2E"></i>Break</span><span><i style="background:#E4E9F1;border:1px solid #5A6B85"></i>Assembly</span></span></h2>
+  <div style="overflow-x:auto"><div style="min-width:640px">${timeline(TD.day,TD.now)}</div></div></div>
+ <div class="grid g2" id="nowcards">${nowCards()}</div>
+ <div class="card" style="margin-top:14px" id="freebox"><h2>Free teachers at ${t12(TD.now)} <span class="st ok">${ft.length}</span></h2><p style="margin:0 0 8px">Teachers who could take a substitution right now.</p><div class="chips">${ft.slice(0,40).map(t=>`<span class="chip ${secById(t.home).cx}" style="cursor:default"><span class="tag">${secById(t.home).short}</span> ${t.name} · ${t.subj}</span>`).join('')||'<span>Nobody is free at this time.</span>'}</div></div>
+ </div>`};
+V.today.after=()=>{
+ document.querySelectorAll('#tdday button').forEach(b=>b.onclick=()=>{TD.day=b.dataset.d;render(true)});
+ const tl=$('tl'),nl=$('tl-now');if(!tl||!nl)return;const lo=+tl.dataset.lo,hi=+tl.dataset.hi;
+ const set=m=>{TD.now=Math.max(lo,Math.min(hi,m));nl.style.left=`calc(120px + (100% - 120px) * ${(TD.now-lo)/(hi-lo)})`;nl.dataset.t=t12(TD.now);nl.setAttribute('aria-valuenow',TD.now);
+  tl.querySelectorAll('.blk').forEach(b=>b.classList.remove('now'));$('nowcards').innerHTML=nowCards();
+  const ft=freeTeachers();$('freebox').querySelector('h2').innerHTML=`Free teachers at ${t12(TD.now)} <span class="st ok">${ft.length}</span>`;
+  $('freebox').querySelector('.chips').innerHTML=ft.slice(0,40).map(t=>`<span class="chip" style="cursor:default"><span class="tag ${secById(t.home).cx}">${secById(t.home).short}</span> ${t.name} · ${t.subj}</span>`).join('')||'<span>Nobody is free at this time.</span>';
+  SECTIONS.filter(s=>s.active&&dayOn(s,TD.day)).forEach((s,si)=>{const sl=slotsFor(s,pat(TD.day));const lane=tl.querySelectorAll('.track')[si];if(!lane)return;sl.forEach((x,i)=>{if(TD.now>=x.s&&TD.now<x.e)lane.children[i].classList.add('now')})})};
+ const fromX=x=>{const r=tl.querySelector('.track').getBoundingClientRect();return Math.round((lo+(x-r.left)/r.width*(hi-lo))/5)*5};
+ let drag=false;
+ tl.addEventListener('pointerdown',e=>{if(e.target.closest('.lanes,.nowline')){drag=true;tl.setPointerCapture(e.pointerId);set(fromX(e.clientX))}});
+ tl.addEventListener('pointermove',e=>{if(drag)set(fromX(e.clientX))});
+ tl.addEventListener('pointerup',()=>drag=false);
+ nl.addEventListener('keydown',e=>{if(e.key=='ArrowRight'){set(TD.now+5);e.preventDefault()}if(e.key=='ArrowLeft'){set(TD.now-5);e.preventDefault()}});
+ document.querySelectorAll('.chip .tag').forEach(()=>{});
+};
+
+/* ================= CLASS TIMETABLE ================= */
+let CT={cid:'9-A'};
+function classOptions(sel){return SECTIONS.filter(s=>s.active).map(s=>`<optgroup label="${s.name}">${CLASSES.filter(c=>secOf(c.cls)==s).map(c=>`<option value="${c.id}" ${c.id==sel?'selected':''}>Class ${c.cls} – ${c.letter}</option>`).join('')}</optgroup>`).join('')}
+function clashText(k){const c=clashes()[k];if(!c)return '';return c.map(x=>{const e=E[x.with.k];return x.kind=='teacher'?`${tOf(E[k].t).name} also teaches ${x.with.c} (${secOfClass(x.with.c).short} P${x.with.pn}, ${t12(x.with.s)}–${t12(x.with.e)})`:`${E[k].r} is also booked by ${x.with.c} (${t12(x.with.s)}–${t12(x.with.e)})`}).join('; ')}
+V.class=()=>{
+ const c=cOf(CT.cid),s=secOf(c.cls),reg=slotsFor(s,'reg'),fri=slotsFor(s,'fri'),days=DAYS.filter(d=>dayOn(s,d));
+ const today=REALDAY;const CLx=clashes();
+ const counts={};days.forEach(d=>periodsOf(s,d).forEach(p=>{const e=E[key(c.id,d,p.pn)];if(e)counts[e.s]=(counts[e.s]||0)+1}));
+ const mine=Object.keys(CLx).filter(k=>k.startsWith(c.id+'|'));
+ const allClashClasses=[...new Set(Object.keys(CLx).map(k=>k.split('|')[0]))];
+ const maxP=Math.max(reg.filter(x=>x.t=='p').length,fri.filter(x=>x.t=='p').length);
+ const rows=reg.slice();const extra=fri.filter(x=>x.t=='p'&&x.pn>reg.filter(r=>r.t=='p').length);extra.forEach(x=>rows.push({...x,onlyFri:true}));
+ const cell=(d,pn)=>{const sl=periodsOf(s,d).find(p=>p.pn==pn);if(!sl)return `<div class="cell off">No period</div>`;
+  const k=key(c.id,d,pn),e=E[k],tm=pat(d)=='fri'?`<span class="tm">${t12s(sl.s)}–${t12s(sl.e)}</span>`:'';
+  if(!e)return `<div class="cell empty" data-k="${k}" draggable="false">${tm}+ Add</div>`;
+  return `<div class="cell ${CLx[k]?'clash':''}" data-k="${k}" draggable="true" style="background:${subjBg(e.s)}" title="${esc(clashText(k))}">${tm}<b>${e.s}</b><span>${shortN(tOf(e.t).name)}</span><span>${e.r}</span></div>`};
+ return `<div class="view">
+ <div class="head"><div><h1>Class timetable</h1><p>Click a period to edit it. Drag one period onto another to swap them.</p></div>
+  <div class="acts"><button class="btn ghost" data-exp="PDF">${ic('dl')}PDF</button><button class="btn ghost" data-exp="Excel">${ic('dl')}Excel</button></div></div>
+ <div class="card" style="margin-bottom:14px"><div class="row" style="align-items:center">
+  <label class="f" style="flex:0 1 260px">Class<select id="ctc">${classOptions(c.id)}</select></label>
+  <div style="flex:3 1 300px" class="${s.cx}"><span class="tag">${s.name}</span> uses its own timings: <b>${PATN.reg}</b> ${t12(reg[0].s)}–${t12(reg[reg.length-1].e)} · <b>Friday</b> ${t12(fri[0].s)}–${t12(fri[fri.length-1].e)}${s.sat?'':' · Saturday off'} <button class="btn ghost" data-go="bells" style="padding:4px 10px">Change timings</button></div>
+ </div>
+ ${allClashClasses.length?`<div class="notice bad" style="margin-top:10px">${ic('warn')}<div>${nClash()} clash${nClash()>1?'es':''} in the school (same teacher or room at the same time). Classes affected: ${allClashClasses.map(x=>`<button class="chip" data-jump="${x}" style="margin:2px">${x}</button>`).join('')}</div></div>`:''}
+ </div>
+ <div class="card" style="padding:0;overflow:auto;max-height:78vh"><table class="tt"><thead><tr><th class="ph">Period</th>${days.map(d=>`<th class="${d==today?'today':''}">${DAYN[d]}${d=='Fri'&&s.sched.fri?'<br><span style="font-weight:400;text-transform:none">short day</span>':''}</th>`).join('')}</tr></thead><tbody>
+  ${rows.map(r=>r.t!='p'?`<tr class="still"><td class="ph"><b>${r.t=='brk'?'Break':'Assembly'}</b>${t12s(r.s)}–${t12s(r.e)}</td><td class="brkrow" colspan="${days.length}">${r.label.toUpperCase()}${(()=>{const f=fri.find(x=>x.t==r.t);return f&&days.includes('Fri')?` · Friday ${t12s(f.s)}–${t12s(f.e)}`:''})()}</td></tr>`
+   :`<tr class="still"><td class="ph"><b>${r.label}</b>${r.onlyFri?'Friday only':`${t12s(r.s)}–${t12s(r.e)}`}</td>${days.map(d=>`<td>${cell(d,r.pn)}</td>`).join('')}</tr>`).join('')}
+ </tbody></table></div>
+ <div class="grid g2" style="margin-top:14px">
+  <div class="card"><h2>Periods per week</h2><div class="chips">${SUBJ[s.id].map(x=>`<span class="chip" style="cursor:default;background:${subjBg(x)};border-color:transparent;color:var(--ink)">${x} <b>${counts[x]||0}</b></span>`).join('')}</div>
+   <p style="margin:8px 0 0">${days.reduce((a,d)=>a+periodsOf(s,d).length,0)} periods a week · ${days.reduce((a,d)=>a+periodsOf(s,d).filter(p=>!E[key(c.id,d,p.pn)]).length,0)} still empty</p></div>
+  <div class="card"><h2>Clashes in ${c.id} <span class="st ${mine.length?'bad':'ok'}">${mine.length}</span></h2>${mine.length?`<div class="list">${mine.map(k=>{const [,d,pn]=k.split('|');return `<div class="li"><div class="t"><b>${DAYN[d]} P${pn}</b> · ${clashText(k)}</div><button class="btn ghost" data-open="${k}">Fix</button></div>`}).join('')}</div>`:'<p style="margin:0">No teacher or room is double-booked for this class. Clashes are checked by actual clock time, so a teacher in two sections with different bells is caught too.</p>'}</div>
+ </div></div>`};
+V.class.after=()=>{
+ $('ctc').onchange=e=>{CT.cid=e.target.value;render()};
+ document.querySelectorAll('[data-jump]').forEach(b=>b.onclick=()=>{CT.cid=b.dataset.jump;render()});
+ document.querySelectorAll('[data-exp]').forEach(b=>b.onclick=()=>toast(`${b.dataset.exp} export runs on the server in FCMS`));
+ document.querySelectorAll('.cell[data-k]').forEach(el=>{el.onclick=()=>openCell(el.dataset.k);
+  el.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',el.dataset.k);el.style.opacity=.5});
+  el.addEventListener('dragend',()=>el.style.opacity=1);
+  el.addEventListener('dragover',e=>{e.preventDefault();el.classList.add('dragover')});
+  el.addEventListener('dragleave',()=>el.classList.remove('dragover'));
+  el.addEventListener('drop',e=>{e.preventDefault();const a=e.dataTransfer.getData('text/plain'),b=el.dataset.k;if(!a||a==b)return;const ea=E[a],eb=E[b];if(eb)E[a]=eb;else delete E[a];if(ea)E[b]=ea;else delete E[b];dirty();const n=(clashes()[a]?1:0)+(clashes()[b]?1:0);toast(n?'Swapped · check the red clash marks':'Periods swapped',n?'bad':'ok');shell();render(true)});
+ });
+ document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openCell(b.dataset.open));
+};
+
+/* cell editor drawer */
+function openCell(k){
+ const [cid,d,pn]=k.split('|'),s=secOfClass(cid),sl=periodsOf(s,d).find(p=>p.pn==+pn),e=E[k]||{};
+ let subj=e.s||'',tid=e.t||'',room=e.r||cOf(cid).room;
+ const draw=()=>{
+  const pool=subj?(POOL[s.id][subj]||[]):[];const others=TEACHERS.filter(t=>!pool.includes(t.id));
+  const topt=t=>{const b=busyT(t.id,d,sl.s,sl.e,k);return `<option value="${t.id}" ${t.id==tid?'selected':''} ${b?'disabled':''}>${t.name} · ${t.subj}${b?` — busy in ${b.c} (${t12s(b.s)}–${t12s(b.e)})`:''}</option>`};
+  const ropt=r=>{const b=busyR(r.name,d,sl.s,sl.e,k);return `<option ${r.name==room?'selected':''} ${b&&r.name!=cOf(cid).room?'disabled':''}>${r.name}${b?` — used by ${b.c}`:''}</option>`};
+  const freeN=pool.filter(id=>!busyT(id,d,sl.s,sl.e,k)).length;
+  $('layer').innerHTML=`<div class="scrim" id="scrim"></div><aside class="drawer" role="dialog" aria-label="Edit period">
+   <div style="display:flex;justify-content:space-between;gap:10px"><div><h2>${cid} · ${DAYN[d]} · P${pn}</h2><span class="${s.cx}"><span class="tag">${s.short}</span></span> ${t12(sl.s)}–${t12(sl.e)}</div><button class="x" id="close" aria-label="Close" style="color:var(--ink);font-size:16px">✕</button></div>
+   <label class="f">Subject<select id="dsub"><option value="">Choose subject</option>${SUBJ[s.id].map(x=>`<option ${x==subj?'selected':''}>${x}</option>`).join('')}</select></label>
+   <label class="f">Teacher ${subj?`<span class="h">${freeN} of ${pool.length} ${subj} teacher${pool.length==1?'':'s'} free at this time. Busy teachers are greyed out.</span>`:''}
+    <select id="dt"><option value="">Choose teacher</option>${pool.length?`<optgroup label="${subj} teachers">${pool.map(id=>topt(tOf(id))).join('')}</optgroup>`:''}<optgroup label="Other teachers">${others.map(topt).join('')}</optgroup></select></label>
+   <label class="f">Room<select id="dr">${ROOMS.map(ropt).join('')}</select></label>
+   ${E[k]&&clashes()[k]?`<div class="notice bad">${ic('warn')}<div>${clashText(k)}</div></div>`:''}
+   <div class="acts"><button class="btn" id="dsave">Save period</button>${E[k]?'<button class="btn ghost" id="dclear" style="color:var(--bad);border-color:var(--bad)">Clear period</button>':''}<button class="btn ghost" id="dcancel">Cancel</button></div>
+  </aside>`;
+  const close=()=>$('layer').innerHTML='';
+  $('scrim').onclick=close;$('close').onclick=close;$('dcancel').onclick=close;
+  $('dsub').onchange=ev=>{subj=ev.target.value;const p=POOL[s.id][subj]||[];tid=p.find(id=>!busyT(id,d,sl.s,sl.e,k))||'';if(/Computer/.test(subj))room=['Computer Lab 1','Computer Lab 2'].find(r=>!busyR(r,d,sl.s,sl.e,k))||room;draw()};
+  $('dt').onchange=ev=>tid=ev.target.value;$('dr').onchange=ev=>room=ev.target.value;
+  $('dsave').onclick=()=>{if(!subj||!tid){toast('Choose a subject and a teacher','bad');return}E[k]={s:subj,t:tid,r:room};dirty();close();toast(`${cid} ${DAYN[d]} P${pn}: ${subj} saved`,'ok');shell();render(true)};
+  if($('dclear'))$('dclear').onclick=()=>{delete E[k];dirty();close();toast('Period cleared','ok');shell();render(true)};
+ };
+ draw();
+ document.addEventListener('keydown',function escK(ev){if(ev.key=='Escape'){$('layer').innerHTML='';document.removeEventListener('keydown',escK)}});
+}
+
+/* ================= TEACHER TIMETABLE ================= */
+let TT={tid:null};
+V.teacher=()=>{
+ if(!TT.tid)TT.tid=POOL.sec.Physics[0];
+ const t=tOf(TT.tid),I=idx(),CLx=clashes();
+ const my=DAYS.map(d=>(I.t[t.id+'|'+d]||[]).slice().sort((a,b)=>a.s-b.s));
+ const flat=my.flat();const lo=7*60+30,hi=14*60,H=64;const y=m=>(m-lo)/60*H;
+ const hrs=[];for(let h=lo;h<=hi;h+=30)hrs.push(h);
+ return `<div class="view">
+ <div class="head"><div><h1>Teacher timetable</h1><p>Shown on a real clock, because a teacher in two sections follows two different bells.</p></div>
+  <div class="acts"><button class="btn ghost" data-exp="PDF">${ic('dl')}PDF</button></div></div>
+ <div class="card" style="margin-bottom:14px"><div class="row" style="align-items:center">
+  <label class="f" style="flex:0 1 320px">Teacher<select id="tsel">${SECTIONS.map(s=>`<optgroup label="${s.name}">${TEACHERS.filter(x=>x.home==s.id).map(x=>`<option value="${x.id}" ${x.id==t.id?'selected':''}>${x.name} · ${x.subj}${x.secs.length>1?' (2 sections)':''}</option>`).join('')}</optgroup>`).join('')}</select></label>
+  <div style="flex:3 1 300px" class="chips">${t.secs.map(id=>`<span class="${secById(id).cx}"><span class="tag">${secById(id).short}</span></span>`).join('')} <span><b>${flat.length}</b> periods a week · <b>${flat.reduce((a,x)=>a+x.e-x.s,0)/60|0}h ${flat.reduce((a,x)=>a+x.e-x.s,0)%60}m</b> teaching</span> ${flat.some(x=>CLx[x.k])?`<span class="st bad">${flat.filter(x=>CLx[x.k]).length} lessons overlap</span>`:'<span class="st ok">No overlaps</span>'}</div>
+ </div></div>
+ <div class="card" style="overflow-x:auto"><div class="week" style="--days:${DAYS.length};--hh:${H/2}px">
+  <div class="hd"></div>${DAYS.map(d=>`<div class="hd">${DAYN[d]}<br><span style="font-weight:400">${my[DAYS.indexOf(d)].length} periods</span></div>`).join('')}
+  <div class="hrs" style="height:${y(hi)}px">${hrs.map(h=>`<span style="top:${y(h)}px">${h%60?'':t12s(h)}</span>`).join('')}</div>
+  ${my.map(list=>`<div class="col" style="height:${y(hi)}px">${list.map((x,i)=>{const s=secOfClass(x.c),e=E[x.k];return `<div class="lsn ${s.cx} ${CLx[x.k]?'clash':''}" style="top:${y(x.s)}px;height:${y(x.e)-y(x.s)-2}px;animation-delay:${i*30}ms" title="${esc(clashText(x.k))}"><b>${x.c} · ${e.s}</b>${t12s(x.s)}–${t12s(x.e)} · ${e.r}</div>`}).join('')}</div>`).join('')}
+ </div>
+ <div class="legend" style="margin-top:10px">${SECTIONS.map(s=>`<span class="${s.cx}"><span class="tag">${s.short}</span></span>`).join('')}<span><i style="background:var(--bad-bg);border:1px solid var(--bad)"></i>Overlapping lessons</span></div></div>
+ </div>`};
+V.teacher.after=()=>{$('tsel').onchange=e=>{TT.tid=e.target.value;render()};document.querySelectorAll('[data-exp]').forEach(b=>b.onclick=()=>toast('PDF export runs on the server in FCMS'))};
+
+/* ================= DAY PLANNER ================= */
+let DP={day:'Mon',cid:'6-A',draft:null,copy:{}};
+function dpLoad(){const s=secOfClass(DP.cid);DP.draft={};periodsOf(s,DP.day).forEach(p=>{const e=E[key(DP.cid,DP.day,p.pn)];DP.draft[p.pn]=e?{...e}:{s:'',t:'',r:cOf(DP.cid).room}})}
+V.planner=()=>{
+ const s=secOfClass(DP.cid);if(!dayOn(s,DP.day))DP.day='Mon';if(!DP.draft)dpLoad();
+ const sl=slotsFor(s,pat(DP.day));const changed=periodsOf(s,DP.day).some(p=>{const a=DP.draft[p.pn],b=E[key(DP.cid,DP.day,p.pn)]||{s:'',t:'',r:cOf(DP.cid).room};return a.s!=b.s||a.t!=b.t||a.r!=b.r});
+ return `<div class="view">
+ <div class="head"><div><h1>Plan a full day</h1><p>Pick a day and class. Times come from that class's own section bell.</p></div></div>
+ <div class="card" style="margin-bottom:14px"><div class="row">
+  <label class="f" style="flex:0 1 220px">Class<select id="dpc">${classOptions(DP.cid)}</select></label>
+  <div><span style="font-weight:700;display:block;margin-bottom:4px">Day</span><div class="seg" id="dpd">${DAYS.filter(d=>dayOn(s,d)).map(d=>`<button data-d="${d}" class="${DP.day==d?'on':''}">${d}</button>`).join('')}</div></div>
+ </div><p style="margin:8px 0 0" class="${s.cx}"><span class="tag">${s.short}</span> ${DAYN[DP.day]} timings: ${t12(sl[0].s)} to ${t12(sl[sl.length-1].e)} · ${sl.filter(x=>x.t=='p').length} periods</p></div>
+ <div class="card"><div class="tw"><table class="slots"><thead><tr><th>Period</th><th>Time</th><th>Subject</th><th>Teacher</th><th>Room</th></tr></thead><tbody>
+ ${sl.map(x=>{if(x.t!='p')return `<tr class="still ${x.t=='brk'?'brk':'asm'}"><td><b>${x.label}</b></td><td>${t12s(x.s)}–${t12s(x.e)}</td><td colspan="3">—</td></tr>`;
+  const dr=DP.draft[x.pn],k=key(DP.cid,DP.day,x.pn),pool=dr.s?POOL[s.id][dr.s]||[]:[];
+  const tb=id=>busyT(id,DP.day,x.s,x.e,k);
+  const clashDraft=dr.t&&tb(dr.t);
+  return `<tr class="still"><td><b>${x.label}</b></td><td style="white-space:nowrap">${t12s(x.s)}–${t12s(x.e)}</td>
+   <td><select data-ps="${x.pn}" aria-label="Subject ${x.label}"><option value="">—</option>${SUBJ[s.id].map(su=>`<option ${su==dr.s?'selected':''}>${su}</option>`).join('')}</select></td>
+   <td><select data-pt="${x.pn}" aria-label="Teacher ${x.label}" ${dr.s?'':'disabled'}><option value="">${dr.s?'Choose teacher':'Pick subject first'}</option>${pool.map(id=>{const b=tb(id);return `<option value="${id}" ${id==dr.t?'selected':''} ${b&&id!=dr.t?'disabled':''}>${tOf(id).name}${b?` — busy in ${b.c}`:''}</option>`}).join('')}</select>${clashDraft?`<div class="msg">Busy in ${clashDraft.c} at this time</div>`:''}</td>
+   <td><select data-pr="${x.pn}" aria-label="Room ${x.label}">${ROOMS.map(r=>`<option ${r.name==dr.r?'selected':''}>${r.name}</option>`).join('')}</select></td></tr>`}).join('')}
+ </tbody></table></div>
+ <div class="sum" style="margin-top:12px"><div class="acts" style="align-items:center"><span>Copy this day to</span>${DAYS.filter(d=>d!=DP.day&&dayOn(s,d)).map(d=>`<button class="chip ${DP.copy[d]?'on':''}" data-cp="${d}">${d}</button>`).join('')}<button class="btn ghost" id="dpcopy" ${Object.values(DP.copy).some(Boolean)?'':'disabled'}>${ic('copy')}Copy</button></div>
+  <div class="acts">${changed?'<span class="st warn">Unsaved changes</span>':''}<button class="btn ghost" id="dpclear">Clear all</button><button class="btn" id="dpsave" ${changed?'':'disabled'}>Save full day</button></div></div>
+ <p style="margin:6px 0 0">Copying uses period numbers. If Friday has fewer periods, the extra lessons are skipped, and any teacher who is busy at the new time is left out.</p>
+ </div></div>`};
+V.planner.after=()=>{
+ $('dpc').onchange=e=>{DP.cid=e.target.value;DP.draft=null;DP.copy={};render(true)};
+ document.querySelectorAll('#dpd button').forEach(b=>b.onclick=()=>{DP.day=b.dataset.d;DP.draft=null;DP.copy={};render(true)});
+ const s=secOfClass(DP.cid);
+ document.querySelectorAll('[data-ps]').forEach(el=>el.onchange=()=>{const d=DP.draft[el.dataset.ps];d.s=el.value;const p=periodsOf(s,DP.day).find(x=>x.pn==+el.dataset.ps);d.t=(POOL[s.id][d.s]||[]).find(id=>!busyT(id,DP.day,p.s,p.e,key(DP.cid,DP.day,p.pn)))||'';if(/Computer/.test(d.s))d.r='Computer Lab 1';render(true)});
+ document.querySelectorAll('[data-pt]').forEach(el=>el.onchange=()=>{DP.draft[el.dataset.pt].t=el.value;render(true)});
+ document.querySelectorAll('[data-pr]').forEach(el=>el.onchange=()=>{DP.draft[el.dataset.pr].r=el.value;render(true)});
+ document.querySelectorAll('[data-cp]').forEach(b=>b.onclick=()=>{DP.copy[b.dataset.cp]=!DP.copy[b.dataset.cp];render(true)});
+ $('dpclear').onclick=()=>{Object.values(DP.draft).forEach(d=>{d.s='';d.t=''});render(true)};
+ $('dpsave').onclick=()=>{periodsOf(s,DP.day).forEach(p=>{const d=DP.draft[p.pn],k=key(DP.cid,DP.day,p.pn);if(d.s&&d.t)E[k]={...d};else delete E[k]});dirty();toast(`${DP.cid} · ${DAYN[DP.day]} saved`,'ok');shell();render(true)};
+ if($('dpcopy'))$('dpcopy').onclick=()=>{let n=0,skip=0;Object.keys(DP.copy).filter(d=>DP.copy[d]).forEach(d=>{periodsOf(s,d).forEach(p=>{const src=E[key(DP.cid,DP.day,p.pn)];const k=key(DP.cid,d,p.pn);if(!src){delete E[k];return}dirty();if(busyT(src.t,d,p.s,p.e,k)){skip++;E[k]={s:src.s,t:'',r:src.r};delete E[k];return}E[k]={...src};n++})});dirty();DP.copy={};toast(`${n} periods copied${skip?` · ${skip} skipped (teacher busy)`:''}`,skip?'bad':'ok');shell();render(true)};
+};
+
+/* ================= PERIOD TIMINGS (bell schedules) ================= */
+let BS={sid:'pri',p:'reg',draft:null,confirm:null};
+function bsLoad(){const s=secById(BS.sid);BS.draft=JSON.parse(JSON.stringify(s.sched[BS.p]))}
+function draftSlots(){const sc=BS.draft;let m=toMin(sc.start),n=0;return sc.slots.map((x,i)=>{const o={...x,i,s:m,e:m+(+x.d||0)};m=o.e;if(x.t=='p'){o.pn=++n;o.label='P'+n}else o.label=x.l||(x.t=='brk'?'Break':'Assembly');return o})}
+V.bells=()=>{
+ const s=secById(BS.sid);if(!BS.draft)bsLoad();const sl=draftSlots();
+ const changed=JSON.stringify(BS.draft)!=JSON.stringify(s.sched[BS.p]);
+ const lo=Math.floor((sl[0].s-15)/60)*60,hi=Math.max(lo+60,Math.ceil((sl[sl.length-1].e+15)/60)*60);const pc=m=>((m-lo)/(hi-lo)*100).toFixed(2)+'%';
+ const pCount=sl.filter(x=>x.t=='p').length;
+ return `<div class="view">
+ <div class="head"><div><h1>Period timings</h1><p>Every section has its own bell, with a separate Friday timing. Change a duration and the times after it move automatically.</p></div></div>
+ <div class="grid" style="grid-template-columns:minmax(0,260px) minmax(0,1fr);align-items:start" id="bgrid">
+  <div class="stack" style="gap:8px">${SECTIONS.map(x=>{const r=slotsFor(x,'reg');return `<button class="secard ${x.cx} ${x.id==BS.sid?'on':''} ${x.active?'':'off'}" data-sid="${x.id}"><b>${x.name}</b><span>Classes ${x.classes[0]} to ${x.classes[x.classes.length-1]}</span><span>${r.filter(y=>y.t=='p').length} periods · ${t12(r[0].s)}–${t12(r[r.length-1].e)}</span>${x.active?'':'<span class="st mute" style="align-self:flex-start">Not used on this campus</span>'}</button>`}).join('')}
+   <button class="btn ghost" data-go="sections">${ic('plus')}Add or switch off a section</button></div>
+  <div class="card ${s.cx}">
+   <h2><span><span class="tag">${s.short}</span> ${s.name}</span><div class="seg" id="bpat">${['reg','fri'].map(p=>`<button data-p="${p}" class="${BS.p==p?'on':''}">${PATN[p]}</button>`).join('')}</div></h2>
+   <div class="tline" style="--hr:${(60/(hi-lo)*100).toFixed(3)}%;margin-bottom:12px"><div class="axis2" style="left:0">${(()=>{const a=[];for(let h=lo;h<=hi;h+=60)a.push(`<span style="left:${pc(h)}">${t12s(h)}</span>`);return a.join('')})()}</div>
+    <div class="track" style="margin-top:2px">${sl.map((x,i)=>`<div class="blk ${x.t=='brk'?'brk':x.t=='asm'?'asm':''}" style="left:${pc(x.s)};width:calc(${pc(x.e)} - ${pc(x.s)} - 2px);animation-delay:${i*25}ms" title="${x.label}">${x.t=='p'?x.label:x.t=='brk'?'Brk':'Asm'}</div>`).join('')}</div></div>
+   <div class="row" style="margin-bottom:10px;align-items:flex-end">
+    <label class="f" style="flex:0 0 150px">School starts at<input type="time" id="bstart" value="${BS.draft.start}"></label>
+    <div style="flex:1 1 200px"><b>${pCount} periods</b> · ends at <b>${t12(sl[sl.length-1].e)}</b> · ${Math.floor((sl[sl.length-1].e-sl[0].s)/60)}h ${(sl[sl.length-1].e-sl[0].s)%60}m day</div>
+    <label class="f" style="flex:0 1 240px">Copy timings from<select id="bcopy"><option value="">Choose…</option>${SECTIONS.flatMap(x=>['reg','fri'].filter(p=>!(x.id==s.id&&p==BS.p)).map(p=>`<option value="${x.id}|${p}">${x.short} · ${PATN[p]}</option>`)).join('')}</select></label>
+   </div>
+   <div class="tw"><table class="slots"><thead><tr><th>Slot</th><th>Type</th><th>Length (min)</th><th>Starts</th><th>Ends</th><th>Move</th></tr></thead><tbody>
+    ${sl.map((x,i)=>`<tr class="still ${x.t=='brk'?'brk':x.t=='asm'?'asm':''}"><td><b>${x.t=='p'?x.label:`<input type="text" data-l="${i}" value="${esc(x.label)}" aria-label="Name" style="max-width:150px">`}</b></td>
+     <td><select data-ty="${i}" aria-label="Type"><option value="p" ${x.t=='p'?'selected':''}>Period</option><option value="brk" ${x.t=='brk'?'selected':''}>Break</option><option value="asm" ${x.t=='asm'?'selected':''}>Assembly / Prayer</option></select></td>
+     <td><input type="number" min="5" max="120" step="5" data-du="${i}" value="${x.d}" aria-label="Minutes"></td>
+     <td>${t12(x.s)}</td><td>${t12(x.e)}</td>
+     <td style="white-space:nowrap"><button class="mini" data-up="${i}" ${i?'':'disabled'} aria-label="Move up">↑</button> <button class="mini" data-dn="${i}" ${i<sl.length-1?'':'disabled'} aria-label="Move down">↓</button> <button class="mini" data-rm="${i}" style="color:var(--bad)" aria-label="Remove">✕</button></td></tr>`).join('')}
+   </tbody></table></div>
+   <div class="acts" style="margin-top:10px"><button class="btn ghost" data-add="p">${ic('plus')}Add period</button><button class="btn ghost" data-add="brk">${ic('plus')}Add break</button><button class="btn ghost" data-add="asm">${ic('plus')}Add assembly</button></div>
+   ${BS.confirm?`<div class="inline-confirm" style="margin-top:12px"><b>${BS.confirm} lessons are set in periods that will no longer exist.</b>Saving will remove those lessons from the class timetables of ${s.short}.<div class="acts"><button class="btn danger" id="byes">Save and remove ${BS.confirm} lessons</button><button class="btn ghost" id="bno">Go back</button></div></div>`
+   :`<div class="sum" style="margin-top:12px"><span>${changed?'<span class="st warn">Unsaved changes</span>':'<span class="st ok">Saved</span>'} Breaks are not numbered, so periods stay P1, P2, P3… after a break.</span><div class="acts"><button class="btn ghost" id="breset" ${changed?'':'disabled'}>Discard</button><button class="btn" id="bsave" ${changed?'':'disabled'}>Save ${s.short} ${PATN[BS.p]} timings</button></div></div>`}
+  </div>
+ </div>
+ <div class="card" style="margin-top:14px"><h2>All sections side by side · ${PATN[BS.p]}</h2><div style="overflow-x:auto"><div style="min-width:640px">${timeline(BS.p=='fri'?'Fri':'Mon',null,'cmp')}</div></div></div>
+ </div>`};
+V.bells.after=()=>{
+ const s=secById(BS.sid);const rr=()=>{BS.confirm=null;render(true)};
+ document.querySelectorAll('[data-sid]').forEach(b=>b.onclick=()=>{BS.sid=b.dataset.sid;BS.draft=null;BS.confirm=null;render()});
+ document.querySelectorAll('#bpat button').forEach(b=>b.onclick=()=>{BS.p=b.dataset.p;BS.draft=null;BS.confirm=null;render(true)});
+ $('bstart').onchange=e=>{if(e.target.value){BS.draft.start=e.target.value;rr()}};
+ $('bcopy').onchange=e=>{if(!e.target.value)return;const [id,p]=e.target.value.split('|');BS.draft=JSON.parse(JSON.stringify(secById(id).sched[p]));toast(`Copied ${secById(id).short} ${PATN[p]} timings. Review, then save.`);rr()};
+ document.querySelectorAll('[data-du]').forEach(i=>i.onchange=()=>{BS.draft.slots[+i.dataset.du].d=Math.max(5,Math.min(120,parseInt(i.value)||5));rr()});
+ document.querySelectorAll('[data-ty]').forEach(i=>i.onchange=()=>{const x=BS.draft.slots[+i.dataset.ty];x.t=i.value;x.l=i.value=='brk'?'Break':i.value=='asm'?'Assembly':undefined;rr()});
+ document.querySelectorAll('[data-l]').forEach(i=>i.onchange=()=>{BS.draft.slots[+i.dataset.l].l=i.value||undefined;rr()});
+ const mv=(i,j)=>{const a=BS.draft.slots;[a[i],a[j]]=[a[j],a[i]];rr()};
+ document.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>mv(+b.dataset.up,+b.dataset.up-1));
+ document.querySelectorAll('[data-dn]').forEach(b=>b.onclick=()=>mv(+b.dataset.dn,+b.dataset.dn+1));
+ document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{if(BS.draft.slots.length<=1){toast('A day needs at least one slot','bad');return}BS.draft.slots.splice(+b.dataset.rm,1);rr()});
+ document.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{const t=b.dataset.add;const last=[...BS.draft.slots].reverse().find(x=>x.t=='p');BS.draft.slots.push(t=='p'?P(last?last.d:40):t=='brk'?B(15):A(10));rr()});
+ const days=BS.p=='fri'?['Fri']:DAYS.filter(d=>d!='Fri');
+ const lost=()=>{const n=BS.draft.slots.filter(x=>x.t=='p').length;return Object.keys(E).filter(k=>{const [c,d,pn]=k.split('|');return days.includes(d)&&secOfClass(c)==s&&+pn>n}).length};
+ const doSave=()=>{const n=BS.draft.slots.filter(x=>x.t=='p').length;Object.keys(E).forEach(k=>{const [c,d,pn]=k.split('|');if(days.includes(d)&&secOfClass(c)==s&&+pn>n)delete E[k]});s.sched[BS.p]=JSON.parse(JSON.stringify(BS.draft));dirty();BS.confirm=null;toast(`${s.short} ${PATN[BS.p]} timings saved`,'ok');shell();render(true)};
+ if($('bsave'))$('bsave').onclick=()=>{const n=lost();if(n){BS.confirm=n;render(true)}else doSave()};
+ if($('breset'))$('breset').onclick=()=>{bsLoad();rr()};
+ if($('byes'))$('byes').onclick=doSave;if($('bno'))$('bno').onclick=rr;
+};
+
+/* ================= SECTIONS & CLASSES ================= */
+let SC={err:''};
+V.sections=()=>`<div class="view">
+ <div class="head"><div><h1>Sections &amp; classes</h1><p>Most campuses have 3 sections; some also run a Cambridge section. Switch off what a campus does not have, and move classes between sections.</p></div></div>
+ <div class="grid g-issue">
+  <div class="card"><h2>School sections</h2><div class="tw"><table><thead><tr><th>Section</th><th>Classes</th><th>Saturday</th><th>On this campus</th></tr></thead><tbody>
+   ${SECTIONS.map((s,i)=>`<tr class="still"><td class="${s.cx}"><span class="tag">${s.short}</span><br><input type="text" data-sn="${i}" value="${esc(s.name)}" aria-label="Section name" style="margin-top:4px"></td><td>${s.classes.length?s.classes.map(c=>`<span class="chip" style="cursor:default;margin:1px">${c}</span>`).join(''):'<span class="st mute">No classes</span>'}</td>
+    <td><label style="display:flex;gap:6px;align-items:center;font-weight:700"><input type="checkbox" data-sat="${i}" ${s.sat?'checked':''}> Working</label></td>
+    <td><label style="display:flex;gap:6px;align-items:center;font-weight:700"><input type="checkbox" data-act="${i}" ${s.active?'checked':''}> ${s.active?'Active':'Off'}</label></td></tr>`).join('')}
+  </tbody></table></div>
+  <div class="row" style="margin-top:12px"><label class="f">New section name<input type="text" id="nsn" placeholder="e.g. Montessori Section"></label><div style="flex:0 0 auto"><button class="btn" id="nsadd">${ic('plus')}Add section</button></div></div>${SC.err?`<p class="msg">${SC.err}</p>`:''}
+  <p style="margin:8px 0 0">A new section starts with a copy of the Secondary timings. Adjust them in Period timings.</p></div>
+  <div class="card" style="align-self:start"><h2>Which section is each class in?</h2><div class="tw" style="max-height:520px;overflow:auto"><table><thead><tr><th>Class</th><th>Sections</th><th>Belongs to</th></tr></thead><tbody>
+   ${[...new Set(CLASSES.map(c=>c.cls))].map(cl=>`<tr class="still"><td><b>${cl}</b></td><td>${CLASSES.filter(c=>c.cls==cl).map(c=>c.letter).join(', ')}</td><td><select data-mv="${esc(cl)}" aria-label="Section for class ${cl}">${SECTIONS.map(s=>`<option value="${s.id}" ${secOf(cl)==s?'selected':''}>${s.short}</option>`).join('')}</select></td></tr>`).join('')}
+  </tbody></table></div>
+  <div class="notice warn" style="margin-top:10px">${ic('info')}<div>Your current class list also has “14”, “Testing Class”, “VI” (same as 6) and BS programmes. Remove or rename these before going live so every class sits in exactly one section.</div></div></div>
+ </div></div>`;
+V.sections.after=()=>{
+ document.querySelectorAll('[data-sn]').forEach(i=>i.onchange=()=>{const s=SECTIONS[+i.dataset.sn];s.name=i.value.trim()||s.name;toast('Section renamed','ok');render(true)});
+ document.querySelectorAll('[data-sat]').forEach(i=>i.onchange=()=>{SECTIONS[+i.dataset.sat].sat=i.checked;toast(`${SECTIONS[+i.dataset.sat].short}: Saturday ${i.checked?'on':'off'}`,'ok');render(true)});
+ document.querySelectorAll('[data-act]').forEach(i=>i.onchange=()=>{SECTIONS[+i.dataset.act].active=i.checked;toast(`${SECTIONS[+i.dataset.act].short} ${i.checked?'switched on':'switched off'} for this campus`,'ok');shell();render(true)});
+ document.querySelectorAll('[data-mv]').forEach(sel=>sel.onchange=()=>{const cl=sel.dataset.mv,to=secById(sel.value),from=secOf(cl);
+  const n=Object.keys(E).filter(k=>cOf(k.split('|')[0]).cls==cl).length;
+  from.classes=from.classes.filter(x=>x!=cl);to.classes.push(cl);
+  Object.keys(E).forEach(k=>{if(cOf(k.split('|')[0]).cls==cl){const e=E[k];if(!(POOL[to.id][e.s]))delete E[k]}});dirty();
+  toast(`Class ${cl} now follows ${to.short} timings${n?' · lessons kept where the subject exists':''}`,'ok');shell();render(true)});
+ $('nsadd').onclick=()=>{const n=$('nsn').value.trim();if(!n){SC.err='Enter a section name.';render(true);return}if(SECTIONS.some(s=>s.name.toLowerCase()==n.toLowerCase())){SC.err='That section already exists.';render(true);return}
+  const id='x'+SECTIONS.length;SECTIONS.push({id,name:n,short:n.split(' ')[0],cx:'sx-x',classes:[],active:true,sat:true,sched:JSON.parse(JSON.stringify(secById('sec').sched))});SUBJ[id]=SUBJ.sec.slice();POOL[id]=POOL.sec;SC.err='';toast(`${n} added`,'ok');render(true)};
+};
+
+/* ================= ROOMS ================= */
+let RM={err:'',filter:''};
+V.rooms=()=>{const I=idx();const use=r=>{let n=0;for(const k in I.r)if(k.startsWith(r+'|'))n+=I.r[k].length;return n};const max=DAYS.length*8;
+ const list=ROOMS.filter(r=>!RM.filter||r.type==RM.filter);
+ return `<div class="view">
+ <div class="head"><div><h1>Rooms</h1><p>Rooms and labs used in timetables. A room cannot be booked by two classes at the same clock time.</p></div></div>
+ <div class="grid g-issue">
+  <div class="card"><h2>Rooms <span class="chips">${['','Classroom','Lab','Activity'].map(t=>`<button class="chip ${RM.filter==t?'on':''}" data-rf="${t}">${t||'All'}</button>`).join('')}</span></h2><div class="tw" style="max-height:560px;overflow:auto"><table><thead><tr><th>Room</th><th>Type</th><th class="num">Capacity</th><th>Use per week</th><th></th></tr></thead><tbody>
+   ${list.map(r=>{const u=use(r.name),p=Math.min(100,Math.round(u/max*100));return `<tr class="still"><td><b>${r.name}</b></td><td>${r.type}</td><td class="num">${r.cap}</td><td style="min-width:150px"><div style="display:flex;gap:8px;align-items:center"><div class="pct" style="flex:1"><i style="width:${p}%;background:${p>85?'var(--bad)':'var(--blue)'}"></i></div><b>${u}</b></div></td><td><button class="x" data-rdel="${esc(r.name)}" aria-label="Delete ${esc(r.name)}">✕</button></td></tr>`}).join('')}
+  </tbody></table></div></div>
+  <div class="card" style="align-self:start"><h2>Add a room</h2><div class="stack" style="gap:10px">
+   <label class="f">Room name<input type="text" id="rn" placeholder="e.g. Physics Lab 2"></label>
+   <div class="row"><label class="f">Type<select id="rt"><option>Classroom</option><option>Lab</option><option>Activity</option></select></label><label class="f">Capacity<input type="number" id="rc" min="1" value="35"></label></div>
+   ${RM.err?`<p class="msg">${RM.err}</p>`:''}<button class="btn" id="radd">${ic('plus')}Add room</button></div></div>
+ </div></div>`};
+V.rooms.after=()=>{
+ document.querySelectorAll('[data-rf]').forEach(b=>b.onclick=()=>{RM.filter=b.dataset.rf;render(true)});
+ $('radd').onclick=()=>{const n=$('rn').value.trim();if(!n){RM.err='Enter a room name.';render(true);return}if(ROOMS.some(r=>r.name.toLowerCase()==n.toLowerCase())){RM.err='That room already exists.';render(true);return}ROOMS.push({name:n,type:$('rt').value,cap:+$('rc').value||30});RM.err='';toast(`${n} added`,'ok');render(true)};
+ document.querySelectorAll('[data-rdel]').forEach(b=>b.onclick=()=>{const n=b.dataset.rdel,used=Object.values(E).filter(e=>e.r==n).length;if(used){toast(`${n} is used in ${used} periods. Change those first.`,'bad');return}ROOMS=ROOMS.filter(r=>r.name!=n);toast(`${n} removed`,'ok');render(true)});
+};
+
+try{const s=localStorage.getItem('fcms-tt-tab');if(s&&V[s])cur=s}catch(e){}
+shell();render();
+
+</script>
